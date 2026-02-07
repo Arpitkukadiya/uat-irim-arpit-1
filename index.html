@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRIM - Integrated Roadway Incident Management</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Global Styles */
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --dark-color: #1f2937;
+            --light-color: #f9fafb;
+            --gray-color: #6b7280;
+            --border-color: #e5e7eb;
+            --sidebar-width: 260px;
+            --header-height: 70px;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: var(--dark-color);
+            transition: background-color 0.3s;
+        }
+
+        body.dark-mode {
+            background-color: #111827;
+            color: #f9fafb;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background-color: white;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            z-index: 1000;
+        }
+
+        .dark-mode .header {
+            background-color: #1f2937;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: white;
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            height: calc(100vh - var(--header-height));
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            box-shadow: var(--card-shadow);
+            z-index: 999;
+        }
+
+        .dark-mode .sidebar {
+            background-color: #1f2937;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 1.5rem 0;
+        }
+
+        .sidebar-item {
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .sidebar-item:hover {
+            background-color: rgba(37, 99, 235, 0.1);
+        }
+
+        .sidebar-item.active {
+            background-color: rgba(37, 99, 235, 0.2);
+            border-right: 4px solid var(--primary-color);
+            font-weight: 600;
+        }
+
+        .sidebar-item i {
+            width: 1.5rem;
+            color: var(--gray-color);
+        }
+
+        .sidebar-item.active i {
+            color: var(--primary-color);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-top: var(--header-height);
+            margin-left: var(--sidebar-width);
+            padding: 1.5rem;
+            transition: margin-left 0.3s ease;
+            min-height: calc(100vh - var(--header-height));
+        }
+
+        .sidebar.collapsed ~ .main-content {
+            margin-left: 0;
+        }
+
+        /* Cards */
+        .card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .dark-mode .card {
+            background-color: #1f2937;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dark-mode .card-header {
+            border-bottom-color: #374151;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #0da271;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dark-mode .kpi-card {
+            background-color: #1f2937;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+        }
+
+        .kpi-card.total::before {
+            background-color: var(--primary-color);
+        }
+
+        .kpi-card.active::before {
+            background-color: var(--warning-color);
+        }
+
+        .kpi-card.resolved::before {
+            background-color: var(--secondary-color);
+        }
+
+        .kpi-card.closed::before {
+            background-color: var(--gray-color);
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .kpi-label {
+            color: var(--gray-color);
+            font-size: 0.875rem;
+        }
+
+        /* Charts */
+        .chart-container {
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        /* Map */
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 0.5rem;
+            z-index: 1;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dark-mode .data-table th,
+        .dark-mode .data-table td {
+            border-bottom-color: #374151;
+        }
+
+        .data-table th {
+            background-color: rgba(0, 0, 0, 0.03);
+            font-weight: 600;
+        }
+
+        .dark-mode .data-table th {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .data-table tr:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+
+        .dark-mode .data-table tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background-color: rgba(245, 158, 11, 0.2);
+            color: #d97706;
+        }
+
+        .status-resolved {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: #059669;
+        }
+
+        .status-closed {
+            background-color: rgba(107, 114, 128, 0.2);
+            color: #6b7280;
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s;
+        }
+
+        .dark-mode .modal-content {
+            background-color: #1f2937;
+        }
+
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dark-mode .modal-header {
+            border-bottom-color: #374151;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        .dark-mode .modal-footer {
+            border-top-color: #374151;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background-color: white;
+            color: var(--dark-color);
+            transition: border-color 0.2s;
+        }
+
+        .dark-mode .form-control {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background-color: white;
+            color: var(--dark-color);
+        }
+
+        .dark-mode .form-select {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+
+        /* Toasts */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1200;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .toast {
+            padding: 1rem 1.25rem;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateX(100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+            max-width: 350px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .toast-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast-info {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .dark-mode .tabs {
+            border-bottom-color: #374151;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+
+        .dark-mode .tab:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab.active {
+            border-bottom-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mt-3 { margin-top: 1.5rem; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mb-3 { margin-bottom: 1.5rem; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar:not(.collapsed) {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+            
+            .header {
+                padding: 0 1rem;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .logo-text {
+                font-size: 1.25rem;
+            }
+        }
+
+        /* Landing Page */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 4rem 1.5rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .hero-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .hero-description {
+            font-size: 1.25rem;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+            opacity: 0.9;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .dark-mode .feature-card {
+            background-color: #1f2937;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        /* Login Page */
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .login-card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .dark-mode .login-card {
+            background-color: #1f2937;
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Main App Container (hidden by default) -->
+    <div class="app-container hidden" id="appContainer">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <button class="btn" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <i class="fas fa-traffic-light logo-icon"></i>
+                    <span class="logo-text">IRIM</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn" id="darkModeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="btn" id="notificationsBtn">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge" id="notificationBadge">3</span>
+                </button>
+                <div class="user-menu">
+                    <button class="btn" id="userMenuBtn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="currentRole">Public User</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu hidden" id="userDropdown">
+                        <a href="#" class="dropdown-item" id="logoutBtn">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <ul class="sidebar-menu">
+                <li class="sidebar-item active" data-page="dashboard">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </li>
+                <li class="sidebar-item" data-page="incidentMap">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>Incident Map</span>
+                </li>
+                <li class="sidebar-item admin-only superadmin-only" data-page="incidentManagement">
+                    <i class="fas fa-tasks"></i>
+                    <span>Incident Management</span>
+                </li>
+                <li class="sidebar-item admin-only superadmin-only" data-page="userManagement">
+                    <i class="fas fa-users-cog"></i>
+                    <span>User Management</span>
+                </li>
+                <li class="sidebar-item superadmin-only" data-page="systemConfig">
+                    <i class="fas fa-cogs"></i>
+                    <span>System Configuration</span>
+                </li>
+                <li class="sidebar-item superadmin-only" data-page="auditLogs">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Audit Logs</span>
+                </li>
+                <li class="sidebar-item" data-page="about">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About IRIM</span>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <!-- Dashboard Page -->
+            <div class="page" id="dashboardPage">
+                <h1 class="page-title">Dashboard</h1>
+                <div class="kpi-grid">
+                    <div class="kpi-card total">
+                        <div class="kpi-label">Total Incidents</div>
+                        <div class="kpi-value" id="totalIncidents">0</div>
+                        <div class="kpi-trend">
+                            <i class="fas fa-arrow-up text-success"></i>
+                            <span>12% from last month</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card active">
+                        <div class="kpi-label">Active Incidents</div>
+                        <div class="kpi-value" id="activeIncidents">0</div>
+                        <div class="kpi-trend">
+                            <i class="fas fa-arrow-down text-danger"></i>
+                            <span>5% from yesterday</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card resolved">
+                        <div class="kpi-label">Resolved Today</div>
+                        <div class="kpi-value" id="resolvedIncidents">0</div>
+                        <div class="kpi-trend">
+                            <i class="fas fa-arrow-up text-success"></i>
+                            <span>8% from yesterday</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card closed">
+                        <div class="kpi-label">Avg. Response Time</div>
+                        <div class="kpi-value" id="avgResponseTime">0</div>
+                        <div class="kpi-label">minutes</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Incidents by Category</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Recent Incidents</h2>
+                            </div>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Type</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentIncidentsTable">
+                                        <!-- Filled by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2 class="card-title">Incidents by Severity</h2>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="severityChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incident Map Page -->
+            <div class="page hidden" id="incidentMapPage">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Live Incident Map</h2>
+                        <div class="map-controls">
+                            <div class="filters">
+                                <select id="incidentTypeFilter" class="form-control" style="width: auto; display: inline-block;">
+                                    <option value="all">All Types</option>
+                                    <option value="accident">Accident</option>
+                                    <option value="blockage">Blockage</option>
+                                    <option value="closure">Closure</option>
+                                    <option value="opening">Opening</option>
+                                </select>
+                                <select id="severityFilter" class="form-control" style="width: auto; display: inline-block;">
+                                    <option value="all">All Severities</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                                <button class="btn btn-primary" id="refreshMapBtn">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                                <button class="btn btn-secondary admin-only superadmin-only" id="addIncidentMapBtn">
+                                    <i class="fas fa-plus"></i> Add Incident
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <!-- Incident Management Page -->
+            <div class="page hidden" id="incidentManagementPage">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Incident Management</h2>
+                        <button class="btn btn-primary" id="addIncidentBtn">
+                            <i class="fas fa-plus"></i> Add New Incident
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Severity</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incidentManagementTable">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Management Page -->
+            <div class="page hidden" id="userManagementPage">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">User & Role Management</h2>
+                        <button class="btn btn-primary" id="addUserBtn">
+                            <i class="fas fa-plus"></i> Add Admin User
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Last Active</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userManagementTable">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Configuration Page -->
+            <div class="page hidden" id="systemConfigPage">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">System Configuration</h2>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab active" data-tab="incidentConfig">Incident Settings</div>
+                        <div class="tab" data-tab="mapConfig">Map Settings</div>
+                        <div class="tab" data-tab="notificationConfig">Notification Settings</div>
+                    </div>
+                    
+                    <div class="tab-content" id="incidentConfig">
+                        <h3 class="mb-3">Incident Categories</h3>
+                        <div class="table-container mb-3">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Description</th>
+                                        <th>Default Severity</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="incidentCategoriesTable">
+                                    <!-- Filled by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-secondary" id="addCategoryBtn">
+                            <i class="fas fa-plus"></i> Add Category
+                        </button>
+                    </div>
+                    
+                    <div class="tab-content hidden" id="mapConfig">
+                        <h3 class="mb-3">Map Configuration</h3>
+                        <div class="form-group">
+                            <label class="form-label">Default Map Center (Latitude)</label>
+                            <input type="number" step="0.0001" class="form-control" id="defaultLat" value="40.7128">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Default Map Center (Longitude)</label>
+                            <input type="number" step="0.0001" class="form-control" id="defaultLng" value="-74.0060">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Default Zoom Level</label>
+                            <input type="range" min="1" max="18" class="form-control" id="defaultZoom" value="12">
+                            <span id="zoomValue">12</span>
+                        </div>
+                        <button class="btn btn-primary" id="saveMapConfigBtn">Save Map Settings</button>
+                    </div>
+                    
+                    <div class="tab-content hidden" id="notificationConfig">
+                        <h3 class="mb-3">Notification Settings</h3>
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="emailNotifications" checked>
+                                <label class="form-check-label" for="emailNotifications">Enable Email Notifications</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="pushNotifications" checked>
+                                <label class="form-check-label" for="pushNotifications">Enable Push Notifications</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Notification Sound</label>
+                            <select class="form-control" id="notificationSound">
+                                <option value="default">Default</option>
+                                <option value="chime">Chime</option>
+                                <option value="alert">Alert</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="saveNotificationConfigBtn">Save Notification Settings</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Logs Page -->
+            <div class="page hidden" id="auditLogsPage">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">System Audit Logs</h2>
+                        <div class="log-filters">
+                            <select id="logTypeFilter" class="form-control" style="width: auto; display: inline-block;">
+                                <option value="all">All Log Types</option>
+                                <option value="incident">Incident</option>
+                                <option value="user">User</option>
+                                <option value="system">System</option>
+                            </select>
+                            <input type="date" id="logDateFilter" class="form-control" style="width: auto; display: inline-block;">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditLogsTable">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- About Page -->
+            <div class="page hidden" id="aboutPage">
+                <div class="hero">
+                    <h1 class="hero-title">Integrated Roadway Incident Management (IRIM)</h1>
+                    <p class="hero-description">
+                        A comprehensive system for monitoring, managing, and responding to roadway incidents in real-time.
+                        IRIM helps transportation agencies improve safety and reduce congestion through efficient incident management.
+                    </p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary btn-lg" id="viewMapBtn">
+                            <i class="fas fa-map-marked-alt"></i> View Live Map
+                        </button>
+                        <button class="btn btn-secondary btn-lg" id="learnMoreBtn">
+                            <i class="fas fa-book"></i> Learn More
+                        </button>
+                    </div>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </div>
+                        <h3 class="feature-title">Real-time Incident Mapping</h3>
+                        <p>Visualize all active incidents on an interactive map with color-coded markers for quick identification.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3 class="feature-title">Analytics Dashboard</h3>
+                        <p>Gain insights with detailed analytics on incident trends, response times, and resolution rates.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users-cog"></i>
+                        </div>
+                        <h3 class="feature-title">Role-based Access</h3>
+                        <p>Different access levels for public users, administrators, and super administrators with tailored interfaces.</p>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h2 class="card-title">System Statistics</h2>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <h3 class="display-4" id="publicTotalIncidents">0</h3>
+                            <p>Total Incidents Tracked</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h3 class="display-4" id="publicAvgResponse">0</h3>
+                            <p>Avg. Response Time (min)</p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h3 class="display-4" id="publicResolvedToday">0</h3>
+                            <p>Resolved Today</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Login Page (shown by default) -->
+    <div class="login-container" id="loginPage">
+        <div class="login-card">
+            <div class="login-logo">
+                <i class="fas fa-traffic-light" style="font-size: 3rem; color: var(--primary-color);"></i>
+                <h1 style="font-size: 2rem; margin-top: 1rem;">IRIM</h1>
+                <p style="color: var(--gray-color);">Integrated Roadway Incident Management</p>
+            </div>
+            
+            <h2 class="login-title">Sign In</h2>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label" for="loginEmail">Email Address</label>
+                    <input type="email" class="form-control" id="loginEmail" placeholder="Enter your email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" class="form-control" id="loginPassword" placeholder="Enter your password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="loginRole">Select Role</label>
+                    <select class="form-control" id="loginRole" required>
+                        <option value="public">Public User (View Only)</option>
+                        <option value="admin">Administrator</option>
+                        <option value="superadmin">Super Administrator</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mt-3">
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <p>For demonstration purposes, use any email and password.</p>
+                    <p>The system will simulate login based on selected role.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Incident Details Modal -->
+    <div class="modal" id="incidentDetailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Incident Details</h2>
+                <button class="btn" id="closeIncidentModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label">Incident ID</label>
+                            <p class="form-control-static" id="detailId">INC-001</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Type</label>
+                            <p class="form-control-static" id="detailType">Accident</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Severity</label>
+                            <p class="form-control-static" id="detailSeverity">High</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <span class="status-badge status-active" id="detailStatus">Active</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="form-label">Location</label>
+                            <p class="form-control-static" id="detailLocation">40.7128° N, 74.0060° W</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Reported</label>
+                            <p class="form-control-static" id="detailReported">2023-10-15 14:30:00</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Last Updated</label>
+                            <p class="form-control-static" id="detailUpdated">2023-10-15 15:45:00</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <p class="form-control-static" id="detailDescription">Multi-vehicle collision on highway causing lane blockage.</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Affected Road Segments</label>
+                    <p class="form-control-static" id="detailRoads">I-95 Northbound between exits 15 and 16</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Assigned Response Team</label>
+                    <p class="form-control-static" id="detailTeam">Roadside Assistance Unit #5</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeDetailsBtn">Close</button>
+                <button class="btn btn-primary admin-only superadmin-only" id="editIncidentBtn">Edit Incident</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Incident Modal -->
+    <div class="modal" id="incidentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="incidentModalTitle">Add New Incident</h2>
+                <button class="btn" id="closeIncidentFormModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="incidentForm">
+                    <div class="form-group">
+                        <label class="form-label" for="incidentType">Incident Type</label>
+                        <select class="form-control" id="incidentType" required>
+                            <option value="">Select type</option>
+                            <option value="accident">Accident</option>
+                            <option value="blockage">Blockage</option>
+                            <option value="closure">Closure</option>
+                            <option value="opening">Opening</option>
+                            <option value="hazard">Hazard</option>
+                            <option value="construction">Construction</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="incidentDescription">Description</label>
+                        <textarea class="form-control" id="incidentDescription" rows="3" placeholder="Describe the incident" required></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="incidentSeverity">Severity</label>
+                                <select class="form-control" id="incidentSeverity" required>
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label" for="incidentStatus">Status</label>
+                                <select class="form-control" id="incidentStatus">
+                                    <option value="active">Active</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="incidentLocation">Location</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="incidentLocation" placeholder="Click on map to select location" readonly>
+                            <button type="button" class="btn btn-secondary" id="selectOnMapBtn">
+                                <i class="fas fa-map-marker-alt"></i> Select on Map
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Or enter coordinates manually: </small>
+                        <div class="row mt-1">
+                            <div class="col-md-6">
+                                <input type="number" step="0.0001" class="form-control" id="incidentLat" placeholder="Latitude">
+                            </div>
+                            <div class="col-md-6">
+                                <input type="number" step="0.0001" class="form-control" id="incidentLng" placeholder="Longitude">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="affectedRoads">Affected Road Segments</label>
+                        <input type="text" class="form-control" id="affectedRoads" placeholder="e.g., I-95 Northbound, exits 15-16">
+                    </div>
+                    
+                    <input type="hidden" id="incidentId">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelIncidentBtn">Cancel</button>
+                <button type="submit" form="incidentForm" class="btn btn-primary" id="saveIncidentBtn">Save Incident</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Admin User</h2>
+                <button class="btn" id="closeUserModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <div class="form-group">
+                        <label class="form-label" for="userName">Full Name</label>
+                        <input type="text" class="form-control" id="userName" placeholder="Enter full name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="userEmail">Email Address</label>
+                        <input type="email" class="form-control" id="userEmail" placeholder="Enter email address" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="userRole">Role</label>
+                        <select class="form-control" id="userRole" required>
+                            <option value="admin">Administrator</option>
+                            <option value="superadmin">Super Administrator</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="userStatus">Status</label>
+                        <select class="form-control" id="userStatus" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelUserBtn">Cancel</button>
+                <button type="submit" form="userForm" class="btn btn-primary" id="saveUserBtn">Save User</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Selection Modal -->
+    <div class="modal" id="mapSelectionModal">
+        <div class="modal-content" style="max-width: 90%; height: 90%;">
+            <div class="modal-header">
+                <h2 class="modal-title">Select Incident Location on Map</h2>
+                <button class="btn" id="closeMapModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="height: calc(100% - 120px); padding: 0;">
+                <div id="selectionMap" style="height: 100%; border-radius: 0 0 0.5rem 0.5rem;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelMapSelectionBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmLocationBtn">Confirm Location</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files (in a real app these would be separate files) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ==================== GLOBAL STATE AND INITIALIZATION ====================
+        
+        // Application state
+        const AppState = {
+            currentUser: null,
+            currentRole: 'public',
+            incidents: [],
+            users: [],
+            auditLogs: [],
+            systemConfig: {
+                incidentCategories: [
+                    { id: 1, name: 'Accident', description: 'Vehicle collisions', defaultSeverity: 'high' },
+                    { id: 2, name: 'Blockage', description: 'Road blockages', defaultSeverity: 'medium' },
+                    { id: 3, name: 'Closure', description: 'Road closures', defaultSeverity: 'high' },
+                    { id: 4, name: 'Opening', description: 'Road openings', defaultSeverity: 'low' },
+                    { id: 5, name: 'Hazard', description: 'Road hazards', defaultSeverity: 'medium' },
+                    { id: 6, name: 'Construction', description: 'Construction work', defaultSeverity: 'medium' }
+                ],
+                mapSettings: {
+                    defaultLat: 40.7128,
+                    defaultLng: -74.0060,
+                    defaultZoom: 12
+                },
+                notificationSettings: {
+                    email: true,
+                    push: true,
+                    sound: 'default'
+                }
+            },
+            // Leaflet map instances
+            mainMap: null,
+            selectionMap: null,
+            // Selected location for new incidents
+            selectedLocation: null,
+            // Charts
+            categoryChart: null,
+            severityChart: null
+        };
+
+        // DOM Elements
+        const elements = {
+            // Pages
+            loginPage: document.getElementById('loginPage'),
+            appContainer: document.getElementById('appContainer'),
+            
+            // Header
+            sidebarToggle: document.getElementById('sidebarToggle'),
+            darkModeToggle: document.getElementById('darkModeToggle'),
+            notificationsBtn: document.getElementById('notificationsBtn'),
+            notificationBadge: document.getElementById('notificationBadge'),
+            userMenuBtn: document.getElementById('userMenuBtn'),
+            userDropdown: document.getElementById('userDropdown'),
+            currentRole: document.getElementById('currentRole'),
+            logoutBtn: document.getElementById('logoutBtn'),
+            
+            // Sidebar
+            sidebar: document.getElementById('sidebar'),
+            sidebarItems: document.querySelectorAll('.sidebar-item'),
+            
+            // Main Content
+            mainContent: document.getElementById('mainContent'),
+            pages: document.querySelectorAll('.page'),
+            
+            // Dashboard
+            totalIncidents: document.getElementById('totalIncidents'),
+            activeIncidents: document.getElementById('activeIncidents'),
+            resolvedIncidents: document.getElementById('resolvedIncidents'),
+            avgResponseTime: document.getElementById('avgResponseTime'),
+            recentIncidentsTable: document.getElementById('recentIncidentsTable'),
+            
+            // Modals
+            incidentDetailsModal: document.getElementById('incidentDetailsModal'),
+            incidentModal: document.getElementById('incidentModal'),
+            userModal: document.getElementById('userModal'),
+            mapSelectionModal: document.getElementById('mapSelectionModal'),
+            
+            // Forms
+            loginForm: document.getElementById('loginForm'),
+            incidentForm: document.getElementById('incidentForm'),
+            userForm: document.getElementById('userForm'),
+            
+            // Buttons
+            viewMapBtn: document.getElementById('viewMapBtn'),
+            addIncidentBtn: document.getElementById('addIncidentBtn'),
+            addIncidentMapBtn: document.getElementById('addIncidentMapBtn'),
+            addUserBtn: document.getElementById('addUserBtn'),
+            saveIncidentBtn: document.getElementById('saveIncidentBtn'),
+            saveUserBtn: document.getElementById('saveUserBtn'),
+            
+            // Tables
+            incidentManagementTable: document.getElementById('incidentManagementTable'),
+            userManagementTable: document.getElementById('userManagementTable'),
+            auditLogsTable: document.getElementById('auditLogsTable'),
+            incidentCategoriesTable: document.getElementById('incidentCategoriesTable'),
+            
+            // Toast Container
+            toastContainer: document.getElementById('toastContainer')
+        };
+
+        // ==================== UTILITY FUNCTIONS ====================
+        
+        // Generate random ID
+        function generateId(prefix = '') {
+            return prefix + Math.random().toString(36).substr(2, 9).toUpperCase();
+        }
+        
+        // Format date
+        function formatDate(date) {
+            return new Date(date).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
+                <span>${message}</span>
+                <button class="btn" onclick="this.parentElement.remove()" style="margin-left: auto;">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            elements.toastContainer.appendChild(toast);
+            
+            // Show toast with animation
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (toast.parentElement) {
+                            toast.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
+            
+            return toast;
+        }
+        
+        // Log audit trail
+        function logAudit(action, details) {
+            const log = {
+                id: generateId('LOG-'),
+                timestamp: new Date().toISOString(),
+                user: AppState.currentUser ? AppState.currentUser.name : 'System',
+                role: AppState.currentRole,
+                action: action,
+                details: details,
+                ip: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
+            };
+            
+            AppState.auditLogs.unshift(log);
+            localStorage.setItem('irim_audit_logs', JSON.stringify(AppState.auditLogs));
+            
+            // Update notification badge
+            updateNotificationBadge();
+        }
+        
+        // Update notification badge
+        function updateNotificationBadge() {
+            const unreadLogs = AppState.auditLogs.filter(log => 
+                new Date(log.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+            ).length;
+            
+            elements.notificationBadge.textContent = unreadLogs > 0 ? unreadLogs.toString() : '';
+        }
+        
+        // Initialize localStorage data
+        function initLocalStorage() {
+            // Load incidents
+            const storedIncidents = localStorage.getItem('irim_incidents');
+            if (storedIncidents) {
+                AppState.incidents = JSON.parse(storedIncidents);
+            } else {
+                // Create mock incidents
+                AppState.incidents = [
+                    {
+                        id: 'INC-001',
+                        type: 'accident',
+                        description: 'Multi-vehicle collision on highway',
+                        severity: 'high',
+                        status: 'active',
+                        location: { lat: 40.7128, lng: -74.0060 },
+                        affectedRoads: 'I-95 Northbound between exits 15 and 16',
+                        reported: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        updated: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+                        responseTeam: 'Roadside Assistance Unit #5'
+                    },
+                    {
+                        id: 'INC-002',
+                        type: 'blockage',
+                        description: 'Fallen tree blocking road',
+                        severity: 'medium',
+                        status: 'active',
+                        location: { lat: 40.7589, lng: -73.9851 },
+                        affectedRoads: '5th Avenue between 42nd and 43rd Street',
+                        reported: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+                        updated: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+                        responseTeam: 'City Maintenance Crew #3'
+                    },
+                    {
+                        id: 'INC-003',
+                        type: 'construction',
+                        description: 'Road construction with lane closures',
+                        severity: 'medium',
+                        status: 'active',
+                        location: { lat: 40.7505, lng: -73.9934 },
+                        affectedRoads: 'Broadway between 34th and 38th Street',
+                        reported: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                        updated: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        responseTeam: 'Construction Team #7'
+                    },
+                    {
+                        id: 'INC-004',
+                        type: 'hazard',
+                        description: 'Oil spill on roadway',
+                        severity: 'high',
+                        status: 'resolved',
+                        location: { lat: 40.6892, lng: -74.0445 },
+                        affectedRoads: 'Brooklyn Bridge approach',
+                        reported: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+                        updated: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+                        responseTeam: 'Hazard Response Unit #2'
+                    },
+                    {
+                        id: 'INC-005',
+                        type: 'closure',
+                        description: 'Road closed for special event',
+                        severity: 'low',
+                        status: 'active',
+                        location: { lat: 40.7829, lng: -73.9654 },
+                        affectedRoads: 'Central Park West between 72nd and 77th Street',
+                        reported: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+                        updated: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+                        responseTeam: 'Event Management Team #1'
+                    }
+                ];
+                localStorage.setItem('irim_incidents', JSON.stringify(AppState.incidents));
+            }
+            
+            // Load users
+            const storedUsers = localStorage.getItem('irim_users');
+            if (storedUsers) {
+                AppState.users = JSON.parse(storedUsers);
+            } else {
+                // Create mock users
+                AppState.users = [
+                    {
+                        id: 'USR-001',
+                        name: 'Super Admin',
+                        email: 'superadmin@irim.com',
+                        role: 'superadmin',
+                        status: 'active',
+                        lastActive: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+                    },
+                    {
+                        id: 'USR-002',
+                        name: 'Admin User',
+                        email: 'admin@irim.com',
+                        role: 'admin',
+                        status: 'active',
+                        lastActive: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                    },
+                    {
+                        id: 'USR-003',
+                        name: 'John Manager',
+                        email: 'john@irim.com',
+                        role: 'admin',
+                        status: 'active',
+                        lastActive: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
+                    },
+                    {
+                        id: 'USR-004',
+                        name: 'Sarah Analyst',
+                        email: 'sarah@irim.com',
+                        role: 'admin',
+                        status: 'inactive',
+                        lastActive: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+                    }
+                ];
+                localStorage.setItem('irim_users', JSON.stringify(AppState.users));
+            }
+            
+            // Load audit logs
+            const storedLogs = localStorage.getItem('irim_audit_logs');
+            if (storedLogs) {
+                AppState.auditLogs = JSON.parse(storedLogs);
+            } else {
+                // Create mock audit logs
+                AppState.auditLogs = [
+                    {
+                        id: 'LOG-001',
+                        timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+                        user: 'Super Admin',
+                        role: 'superadmin',
+                        action: 'Login',
+                        details: 'User logged into the system',
+                        ip: '192.168.1.100'
+                    },
+                    {
+                        id: 'LOG-002',
+                        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        user: 'Admin User',
+                        role: 'admin',
+                        action: 'Incident Update',
+                        details: 'Updated incident INC-002 status to active',
+                        ip: '192.168.1.101'
+                    },
+                    {
+                        id: 'LOG-003',
+                        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+                        user: 'John Manager',
+                        role: 'admin',
+                        action: 'Incident Creation',
+                        details: 'Created new incident INC-005',
+                        ip: '192.168.1.102'
+                    }
+                ];
+                localStorage.setItem('irim_audit_logs', JSON.stringify(AppState.auditLogs));
+            }
+            
+            // Load system config
+            const storedConfig = localStorage.getItem('irim_config');
+            if (storedConfig) {
+                AppState.systemConfig = JSON.parse(storedConfig);
+            }
+        }
+        
+        // ==================== ROLE MANAGEMENT ====================
+        
+        // Set current role
+        function setRole(role) {
+            AppState.currentRole = role;
+            localStorage.setItem('irim_role', role);
+            
+            // Update UI
+            elements.currentRole.textContent = 
+                role === 'public' ? 'Public User' : 
+                role === 'admin' ? 'Administrator' : 
+                'Super Administrator';
+            
+            // Show/hide admin-only elements
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = role === 'admin' || role === 'superadmin' ? '' : 'none';
+            });
+            
+            document.querySelectorAll('.superadmin-only').forEach(el => {
+                el.style.display = role === 'superadmin' ? '' : 'none';
+            });
+            
+            // Log role change
+            logAudit('Role Change', `User switched to ${role} role`);
+        }
+        
+        // Check current role from localStorage
+        function checkStoredRole() {
+            const storedRole = localStorage.getItem('irim_role');
+            if (storedRole) {
+                setRole(storedRole);
+                return true;
+            }
+            return false;
+        }
+        
+        // ==================== PAGE MANAGEMENT ====================
+        
+        // Show specific page
+        function showPage(pageId) {
+            // Hide all pages
+            elements.pages.forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            // Show selected page
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.remove('hidden');
+            }
+            
+            // Update active sidebar item
+            elements.sidebarItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.page === pageId) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // Initialize page-specific content
+            switch (pageId) {
+                case 'dashboard':
+                    initDashboard();
+                    break;
+                case 'incidentMap':
+                    initIncidentMap();
+                    break;
+                case 'incidentManagement':
+                    initIncidentManagement();
+                    break;
+                case 'userManagement':
+                    initUserManagement();
+                    break;
+                case 'systemConfig':
+                    initSystemConfig();
+                    break;
+                case 'auditLogs':
+                    initAuditLogs();
+                    break;
+                case 'about':
+                    initAboutPage();
+                    break;
+            }
+        }
+        
+        // ==================== DASHBOARD FUNCTIONS ====================
+        
+        // Initialize dashboard
+        function initDashboard() {
+            updateDashboardKPIs();
+            updateRecentIncidents();
+            initCharts();
+        }
+        
+        // Update dashboard KPIs
+        function updateDashboardKPIs() {
+            const total = AppState.incidents.length;
+            const active = AppState.incidents.filter(i => i.status === 'active').length;
+            const resolvedToday = AppState.incidents.filter(i => 
+                i.status === 'resolved' && 
+                new Date(i.updated).toDateString() === new Date().toDateString()
+            ).length;
+            
+            // Calculate average response time (simulated)
+            const avgResponse = total > 0 ? Math.floor(Math.random() * 30) + 10 : 0;
+            
+            elements.totalIncidents.textContent = total;
+            elements.activeIncidents.textContent = active;
+            elements.resolvedIncidents.textContent = resolvedToday;
+            elements.avgResponseTime.textContent = avgResponse;
+            
+            // Update public dashboard stats too
+            document.getElementById('publicTotalIncidents').textContent = total;
+            document.getElementById('publicAvgResponse').textContent = avgResponse;
+            document.getElementById('publicResolvedToday').textContent = resolvedToday;
+        }
+        
+        // Update recent incidents table
+        function updateRecentIncidents() {
+            const tbody = elements.recentIncidentsTable;
+            tbody.innerHTML = '';
+            
+            // Get 5 most recent incidents
+            const recentIncidents = [...AppState.incidents]
+                .sort((a, b) => new Date(b.reported) - new Date(a.reported))
+                .slice(0, 5);
+            
+            recentIncidents.forEach(incident => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${incident.id}</td>
+                    <td>${incident.type.charAt(0).toUpperCase() + incident.type.slice(1)}</td>
+                    <td>${incident.affectedRoads.substring(0, 30)}${incident.affectedRoads.length > 30 ? '...' : ''}</td>
+                    <td><span class="status-badge status-${incident.status}">${incident.status.charAt(0).toUpperCase() + incident.status.slice(1)}</span></td>
+                `;
+                row.addEventListener('click', () => showIncidentDetails(incident.id));
+                row.style.cursor = 'pointer';
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Destroy existing charts if they exist
+            if (AppState.categoryChart) {
+                AppState.categoryChart.destroy();
+            }
+            if (AppState.severityChart) {
+                AppState.severityChart.destroy();
+            }
+            
+            // Category chart
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            const categoryData = {
+                accident: AppState.incidents.filter(i => i.type === 'accident').length,
+                blockage: AppState.incidents.filter(i => i.type === 'blockage').length,
+                closure: AppState.incidents.filter(i => i.type === 'closure').length,
+                opening: AppState.incidents.filter(i => i.type === 'opening').length,
+                hazard: AppState.incidents.filter(i => i.type === 'hazard').length,
+                construction: AppState.incidents.filter(i => i.type === 'construction').length
+            };
+            
+            AppState.categoryChart = new Chart(categoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(categoryData).map(key => key.charAt(0).toUpperCase() + key.slice(1)),
+                    datasets: [{
+                        label: 'Incidents by Category',
+                        data: Object.values(categoryData),
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.7)',   // Red for accident
+                            'rgba(245, 158, 11, 0.7)',  // Orange for blockage
+                            'rgba(59, 130, 246, 0.7)',  // Blue for closure
+                            'rgba(16, 185, 129, 0.7)',  // Green for opening
+                            'rgba(139, 92, 246, 0.7)',  // Purple for hazard
+                            'rgba(156, 163, 175, 0.7)'  // Gray for construction
+                        ],
+                        borderColor: [
+                            'rgb(239, 68, 68)',
+                            'rgb(245, 158, 11)',
+                            'rgb(59, 130, 246)',
+                            'rgb(16, 185, 129)',
+                            'rgb(139, 92, 246)',
+                            'rgb(156, 163, 175)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Severity chart
+            const severityCtx = document.getElementById('severityChart').getContext('2d');
+            const severityData = {
+                low: AppState.incidents.filter(i => i.severity === 'low').length,
+                medium: AppState.incidents.filter(i => i.severity === 'medium').length,
+                high: AppState.incidents.filter(i => i.severity === 'high').length
+            };
+            
+            AppState.severityChart = new Chart(severityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Low', 'Medium', 'High'],
+                    datasets: [{
+                        data: Object.values(severityData),
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.7)',  // Green for low
+                            'rgba(245, 158, 11, 0.7)',  // Orange for medium
+                            'rgba(239, 68, 68, 0.7)'    // Red for high
+                        ],
+                        borderColor: [
+                            'rgb(16, 185, 129)',
+                            'rgb(245, 158, 11)',
+                            'rgb(239, 68, 68)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ==================== INCIDENT MAP FUNCTIONS ====================
+        
+        // Initialize incident map
+        function initIncidentMap() {
+            if (!AppState.mainMap) {
+                AppState.mainMap = L.map('map').setView([
+                    AppState.systemConfig.mapSettings.defaultLat, 
+                    AppState.systemConfig.mapSettings.defaultLng
+                ], AppState.systemConfig.mapSettings.defaultZoom);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(AppState.mainMap);
+            }
+            
+            updateMapIncidents();
+        }
+        
+        // Update incidents on map
+        function updateMapIncidents() {
+            // Clear existing markers
+            AppState.mainMap.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    AppState.mainMap.removeLayer(layer);
+                }
+            });
+            
+            // Get filter values
+            const typeFilter = document.getElementById('incidentTypeFilter').value;
+            const severityFilter = document.getElementById('severityFilter').value;
+            
+            // Add filtered incidents to map
+            AppState.incidents.forEach(incident => {
+                // Apply filters
+                if (typeFilter !== 'all' && incident.type !== typeFilter) return;
+                if (severityFilter !== 'all' && incident.severity !== severityFilter) return;
+                
+                // Determine marker color based on type
+                let markerColor;
+                switch (incident.type) {
+                    case 'accident': markerColor = 'red'; break;
+                    case 'blockage': markerColor = 'orange'; break;
+                    case 'closure': markerColor = 'blue'; break;
+                    case 'opening': markerColor = 'green'; break;
+                    case 'hazard': markerColor = 'purple'; break;
+                    case 'construction': markerColor = 'gray'; break;
+                    default: markerColor = 'blue';
+                }
+                
+                // Create custom icon
+                const icon = L.divIcon({
+                    html: `<div style="background-color: ${markerColor}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+                    iconSize: [24, 24],
+                    className: 'incident-marker'
+                });
+                
+                // Add marker to map
+                const marker = L.marker([incident.location.lat, incident.location.lng], { icon })
+                    .addTo(AppState.mainMap)
+                    .bindPopup(`
+                        <strong>${incident.id}: ${incident.type.charAt(0).toUpperCase() + incident.type.slice(1)}</strong><br>
+                        ${incident.description}<br>
+                        <strong>Severity:</strong> ${incident.severity}<br>
+                        <strong>Status:</strong> ${incident.status}<br>
+                        <button class="btn btn-sm btn-primary" onclick="showIncidentDetails('${incident.id}')">View Details</button>
+                    `);
+                
+                // Add click event
+                marker.on('click', () => {
+                    showIncidentDetails(incident.id);
+                });
+            });
+        }
+        
+        // ==================== INCIDENT MANAGEMENT FUNCTIONS ====================
+        
+        // Initialize incident management
+        function initIncidentManagement() {
+            updateIncidentManagementTable();
+        }
+        
+        // Update incident management table
+        function updateIncidentManagementTable() {
+            const tbody = elements.incidentManagementTable;
+            tbody.innerHTML = '';
+            
+            AppState.incidents.forEach(incident => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${incident.id}</td>
+                    <td>${incident.type.charAt(0).toUpperCase() + incident.type.slice(1)}</td>
+                    <td>${incident.description.substring(0, 40)}${incident.description.length > 40 ? '...' : ''}</td>
+                    <td><span class="badge severity-${incident.severity}">${incident.severity.charAt(0).toUpperCase() + incident.severity.slice(1)}</span></td>
+                    <td>${incident.location.lat.toFixed(4)}, ${incident.location.lng.toFixed(4)}</td>
+                    <td><span class="status-badge status-${incident.status}">${incident.status.charAt(0).toUpperCase() + incident.status.slice(1)}</span></td>
+                    <td>${formatDate(incident.reported)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary view-incident-btn" data-id="${incident.id}">View</button>
+                        <button class="btn btn-sm btn-warning edit-incident-btn" data-id="${incident.id}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-incident-btn" data-id="${incident.id}">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Add event listeners to buttons
+            document.querySelectorAll('.view-incident-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    showIncidentDetails(e.target.dataset.id);
+                });
+            });
+            
+            document.querySelectorAll('.edit-incident-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    editIncident(e.target.dataset.id);
+                });
+            });
+            
+            document.querySelectorAll('.delete-incident-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    deleteIncident(e.target.dataset.id);
+                });
+            });
+        }
+        
+        // Show incident details
+        function showIncidentDetails(incidentId) {
+            const incident = AppState.incidents.find(i => i.id === incidentId);
+            if (!incident) return;
+            
+            // Populate modal
+            document.getElementById('detailId').textContent = incident.id;
+            document.getElementById('detailType').textContent = incident.type.charAt(0).toUpperCase() + incident.type.slice(1);
+            document.getElementById('detailSeverity').textContent = incident.severity.charAt(0).toUpperCase() + incident.severity.slice(1);
+            document.getElementById('detailStatus').textContent = incident.status.charAt(0).toUpperCase() + incident.status.slice(1);
+            document.getElementById('detailStatus').className = `status-badge status-${incident.status}`;
+            document.getElementById('detailLocation').textContent = `${incident.location.lat.toFixed(6)}° N, ${incident.location.lng.toFixed(6)}° W`;
+            document.getElementById('detailReported').textContent = formatDate(incident.reported);
+            document.getElementById('detailUpdated').textContent = formatDate(incident.updated);
+            document.getElementById('detailDescription').textContent = incident.description;
+            document.getElementById('detailRoads').textContent = incident.affectedRoads;
+            document.getElementById('detailTeam').textContent = incident.responseTeam || 'Not assigned';
+            
+            // Show modal
+            elements.incidentDetailsModal.classList.add('active');
+        }
+        
+        // Add new incident
+        function addIncident() {
+            // Reset form
+            document.getElementById('incidentForm').reset();
+            document.getElementById('incidentModalTitle').textContent = 'Add New Incident';
+            document.getElementById('incidentId').value = '';
+            
+            // Show modal
+            elements.incidentModal.classList.add('active');
+        }
+        
+        // Edit incident
+        function editIncident(incidentId) {
+            const incident = AppState.incidents.find(i => i.id === incidentId);
+            if (!incident) return;
+            
+            // Populate form
+            document.getElementById('incidentModalTitle').textContent = 'Edit Incident';
+            document.getElementById('incidentId').value = incident.id;
+            document.getElementById('incidentType').value = incident.type;
+            document.getElementById('incidentDescription').value = incident.description;
+            document.getElementById('incidentSeverity').value = incident.severity;
+            document.getElementById('incidentStatus').value = incident.status;
+            document.getElementById('incidentLocation').value = `${incident.location.lat}, ${incident.location.lng}`;
+            document.getElementById('incidentLat').value = incident.location.lat;
+            document.getElementById('incidentLng').value = incident.location.lng;
+            document.getElementById('affectedRoads').value = incident.affectedRoads;
+            
+            // Show modal
+            elements.incidentModal.classList.add('active');
+        }
+        
+        // Save incident (add or update)
+        function saveIncident(formData) {
+            const id = document.getElementById('incidentId').value;
+            const isEdit = id !== '';
+            
+            const incident = {
+                id: isEdit ? id : generateId('INC-'),
+                type: formData.get('incidentType'),
+                description: formData.get('incidentDescription'),
+                severity: formData.get('incidentSeverity'),
+                status: formData.get('incidentStatus'),
+                location: {
+                    lat: parseFloat(formData.get('incidentLat') || AppState.systemConfig.mapSettings.defaultLat),
+                    lng: parseFloat(formData.get('incidentLng') || AppState.systemConfig.mapSettings.defaultLng)
+                },
+                affectedRoads: formData.get('affectedRoads'),
+                reported: isEdit ? AppState.incidents.find(i => i.id === id).reported : new Date().toISOString(),
+                updated: new Date().toISOString(),
+                responseTeam: isEdit ? (AppState.incidents.find(i => i.id === id).responseTeam || 'Not assigned') : 'Not assigned'
+            };
+            
+            if (isEdit) {
+                // Update existing incident
+                const index = AppState.incidents.findIndex(i => i.id === id);
+                AppState.incidents[index] = incident;
+                showToast('Incident updated successfully', 'success');
+                logAudit('Incident Update', `Updated incident ${incident.id}`);
+            } else {
+                // Add new incident
+                AppState.incidents.push(incident);
+                showToast('Incident added successfully', 'success');
+                logAudit('Incident Creation', `Created new incident ${incident.id}`);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('irim_incidents', JSON.stringify(AppState.incidents));
+            
+            // Update UI
+            updateDashboardKPIs();
+            updateRecentIncidents();
+            updateIncidentManagementTable();
+            
+            // Update map if it's visible
+            if (AppState.mainMap) {
+                updateMapIncidents();
+            }
+            
+            // Close modal
+            elements.incidentModal.classList.remove('active');
+        }
+        
+        // Delete incident
+        function deleteIncident(incidentId) {
+            if (confirm('Are you sure you want to delete this incident?')) {
+                const index = AppState.incidents.findIndex(i => i.id === incidentId);
+                if (index !== -1) {
+                    const deletedIncident = AppState.incidents[index];
+                    AppState.incidents.splice(index, 1);
+                    
+                    // Save to localStorage
+                    localStorage.setItem('irim_incidents', JSON.stringify(AppState.incidents));
+                    
+                    // Update UI
+                    updateDashboardKPIs();
+                    updateRecentIncidents();
+                    updateIncidentManagementTable();
+                    
+                    // Update map if it's visible
+                    if (AppState.mainMap) {
+                        updateMapIncidents();
+                    }
+                    
+                    showToast('Incident deleted successfully', 'success');
+                    logAudit('Incident Deletion', `Deleted incident ${deletedIncident.id}`);
+                }
+            }
+        }
+        
+        // ==================== USER MANAGEMENT FUNCTIONS ====================
+        
+        // Initialize user management
+        function initUserManagement() {
+            updateUserManagementTable();
+        }
+        
+        // Update user management table
+        function updateUserManagementTable() {
+            const tbody = elements.userManagementTable;
+            tbody.innerHTML = '';
+            
+            // Filter out current super admin from the list (for demo purposes)
+            const filteredUsers = AppState.users.filter(user => user.role !== 'superadmin' || user.id === 'USR-001');
+            
+            filteredUsers.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${user.name}</td>
+                    <td>${user.email}</td>
+                    <td>${user.role === 'admin' ? 'Administrator' : 'Super Administrator'}</td>
+                    <td><span class="status-badge status-${user.status}">${user.status.charAt(0).toUpperCase() + user.status.slice(1)}</span></td>
+                    <td>${formatDate(user.lastActive)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning edit-user-btn" data-id="${user.id}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-user-btn" data-id="${user.id}">Delete</button>
+                        ${user.status === 'active' ? 
+                            `<button class="btn btn-sm btn-secondary disable-user-btn" data-id="${user.id}">Disable</button>` : 
+                            `<button class="btn btn-sm btn-success enable-user-btn" data-id="${user.id}">Enable</button>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Add event listeners to buttons
+            document.querySelectorAll('.edit-user-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    editUser(e.target.dataset.id);
+                });
+            });
+            
+            document.querySelectorAll('.delete-user-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    deleteUser(e.target.dataset.id);
+                });
+            });
+            
+            document.querySelectorAll('.disable-user-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    toggleUserStatus(e.target.dataset.id, 'inactive');
+                });
+            });
+            
+            document.querySelectorAll('.enable-user-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    toggleUserStatus(e.target.dataset.id, 'active');
+                });
+            });
+        }
+        
+        // Add new user
+        function addUser() {
+            // Reset form
+            document.getElementById('userForm').reset();
+            
+            // Show modal
+            elements.userModal.classList.add('active');
+        }
+        
+        // Edit user
+        function editUser(userId) {
+            const user = AppState.users.find(u => u.id === userId);
+            if (!user) return;
+            
+            // Populate form
+            document.getElementById('userName').value = user.name;
+            document.getElementById('userEmail').value = user.email;
+            document.getElementById('userRole').value = user.role;
+            document.getElementById('userStatus').value = user.status;
+            
+            // Show modal
+            elements.userModal.classList.add('active');
+        }
+        
+        // Save user (add or update)
+        function saveUser(formData) {
+            // For demo purposes, we'll just add a new user
+            const user = {
+                id: generateId('USR-'),
+                name: formData.get('userName'),
+                email: formData.get('userEmail'),
+                role: formData.get('userRole'),
+                status: formData.get('userStatus'),
+                lastActive: new Date().toISOString()
+            };
+            
+            // Add new user
+            AppState.users.push(user);
+            
+            // Save to localStorage
+            localStorage.setItem('irim_users', JSON.stringify(AppState.users));
+            
+            // Update UI
+            updateUserManagementTable();
+            
+            showToast('User added successfully', 'success');
+            logAudit('User Creation', `Created new ${user.role} user: ${user.name}`);
+            
+            // Close modal
+            elements.userModal.classList.remove('active');
+        }
+        
+        // Delete user
+        function deleteUser(userId) {
+            if (confirm('Are you sure you want to delete this user?')) {
+                const index = AppState.users.findIndex(u => u.id === userId);
+                if (index !== -1 && AppState.users[index].role !== 'superadmin') {
+                    const deletedUser = AppState.users[index];
+                    AppState.users.splice(index, 1);
+                    
+                    // Save to localStorage
+                    localStorage.setItem('irim_users', JSON.stringify(AppState.users));
+                    
+                    // Update UI
+                    updateUserManagementTable();
+                    
+                    showToast('User deleted successfully', 'success');
+                    logAudit('User Deletion', `Deleted user ${deletedUser.name}`);
+                } else {
+                    showToast('Cannot delete super admin user', 'error');
+                }
+            }
+        }
+        
+        // Toggle user status
+        function toggleUserStatus(userId, status) {
+            const user = AppState.users.find(u => u.id === userId);
+            if (user) {
+                user.status = status;
+                user.lastActive = new Date().toISOString();
+                
+                // Save to localStorage
+                localStorage.setItem('irim_users', JSON.stringify(AppState.users));
+                
+                // Update UI
+                updateUserManagementTable();
+                
+                showToast(`User ${status === 'active' ? 'enabled' : 'disabled'} successfully`, 'success');
+                logAudit('User Status Change', `Changed ${user.name} status to ${status}`);
+            }
+        }
+        
+        // ==================== SYSTEM CONFIGURATION FUNCTIONS ====================
+        
+        // Initialize system configuration
+        function initSystemConfig() {
+            updateIncidentCategoriesTable();
+            
+            // Set current values
+            document.getElementById('defaultLat').value = AppState.systemConfig.mapSettings.defaultLat;
+            document.getElementById('defaultLng').value = AppState.systemConfig.mapSettings.defaultLng;
+            document.getElementById('defaultZoom').value = AppState.systemConfig.mapSettings.defaultZoom;
+            document.getElementById('zoomValue').textContent = AppState.systemConfig.mapSettings.defaultZoom;
+            
+            document.getElementById('emailNotifications').checked = AppState.systemConfig.notificationSettings.email;
+            document.getElementById('pushNotifications').checked = AppState.systemConfig.notificationSettings.push;
+            document.getElementById('notificationSound').value = AppState.systemConfig.notificationSettings.sound;
+        }
+        
+        // Update incident categories table
+        function updateIncidentCategoriesTable() {
+            const tbody = elements.incidentCategoriesTable;
+            tbody.innerHTML = '';
+            
+            AppState.systemConfig.incidentCategories.forEach(category => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${category.name}</td>
+                    <td>${category.description}</td>
+                    <td><span class="badge severity-${category.defaultSeverity}">${category.defaultSeverity.charAt(0).toUpperCase() + category.defaultSeverity.slice(1)}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-warning edit-category-btn" data-id="${category.id}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-category-btn" data-id="${category.id}">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Save map configuration
+        function saveMapConfig() {
+            AppState.systemConfig.mapSettings.defaultLat = parseFloat(document.getElementById('defaultLat').value);
+            AppState.systemConfig.mapSettings.defaultLng = parseFloat(document.getElementById('defaultLng').value);
+            AppState.systemConfig.mapSettings.defaultZoom = parseInt(document.getElementById('defaultZoom').value);
+            
+            // Save to localStorage
+            localStorage.setItem('irim_config', JSON.stringify(AppState.systemConfig));
+            
+            showToast('Map configuration saved successfully', 'success');
+            logAudit('System Configuration', 'Updated map settings');
+        }
+        
+        // Save notification configuration
+        function saveNotificationConfig() {
+            AppState.systemConfig.notificationSettings.email = document.getElementById('emailNotifications').checked;
+            AppState.systemConfig.notificationSettings.push = document.getElementById('pushNotifications').checked;
+            AppState.systemConfig.notificationSettings.sound = document.getElementById('notificationSound').value;
+            
+            // Save to localStorage
+            localStorage.setItem('irim_config', JSON.stringify(AppState.systemConfig));
+            
+            showToast('Notification configuration saved successfully', 'success');
+            logAudit('System Configuration', 'Updated notification settings');
+        }
+        
+        // ==================== AUDIT LOGS FUNCTIONS ====================
+        
+        // Initialize audit logs
+        function initAuditLogs() {
+            updateAuditLogsTable();
+        }
+        
+        // Update audit logs table
+        function updateAuditLogsTable() {
+            const tbody = elements.auditLogsTable;
+            tbody.innerHTML = '';
+            
+            // Get filter values
+            const typeFilter = document.getElementById('logTypeFilter').value;
+            const dateFilter = document.getElementById('logDateFilter').value;
+            
+            // Filter logs
+            let filteredLogs = AppState.auditLogs;
+            
+            if (typeFilter !== 'all') {
+                filteredLogs = filteredLogs.filter(log => 
+                    typeFilter === 'incident' ? log.action.includes('Incident') :
+                    typeFilter === 'user' ? log.action.includes('User') :
+                    typeFilter === 'system' ? log.action.includes('System') || log.action.includes('Configuration') || log.action.includes('Login') : true
+                );
+            }
+            
+            if (dateFilter) {
+                const filterDate = new Date(dateFilter);
+                filteredLogs = filteredLogs.filter(log => 
+                    new Date(log.timestamp).toDateString() === filterDate.toDateString()
+                );
+            }
+            
+            // Display logs
+            filteredLogs.forEach(log => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDate(log.timestamp)}</td>
+                    <td>${log.user}</td>
+                    <td>${log.action}</td>
+                    <td>${log.details}</td>
+                    <td>${log.ip}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // ==================== ABOUT PAGE FUNCTIONS ====================
+        
+        // Initialize about page
+        function initAboutPage() {
+            updateDashboardKPIs(); // This also updates the public stats
+        }
+        
+        // ==================== INITIALIZATION ====================
+        
+        // Initialize the application
+        function initApp() {
+            // Initialize localStorage data
+            initLocalStorage();
+            
+            // Check for stored role
+            if (checkStoredRole()) {
+                // User is already logged in
+                elements.loginPage.classList.add('hidden');
+                elements.appContainer.classList.remove('hidden');
+                
+                // Show dashboard by default
+                showPage('dashboard');
+            }
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Update notification badge
+            updateNotificationBadge();
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Login form
+            elements.loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                const role = document.getElementById('loginRole').value;
+                
+                // Simulate login (no actual authentication)
+                AppState.currentUser = {
+                    name: role === 'public' ? 'Public User' : email.split('@')[0],
+                    email: email,
+                    role: role
+                };
+                
+                // Set role
+                setRole(role);
+                
+                // Switch to app interface
+                elements.loginPage.classList.add('hidden');
+                elements.appContainer.classList.remove('hidden');
+                
+                // Show dashboard
+                showPage('dashboard');
+                
+                // Show welcome message
+                showToast(`Welcome to IRIM as ${role === 'public' ? 'Public User' : role === 'admin' ? 'Administrator' : 'Super Administrator'}!`, 'success');
+                
+                // Log login
+                logAudit('Login', `User logged in as ${role} role`);
+            });
+            
+            // Sidebar toggle
+            elements.sidebarToggle.addEventListener('click', () => {
+                elements.sidebar.classList.toggle('collapsed');
+            });
+            
+            // Dark mode toggle
+            elements.darkModeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                const icon = elements.darkModeToggle.querySelector('i');
+                if (document.body.classList.contains('dark-mode')) {
+                    icon.className = 'fas fa-sun';
+                    showToast('Dark mode enabled', 'info');
+                } else {
+                    icon.className = 'fas fa-moon';
+                    showToast('Light mode enabled', 'info');
+                }
+            });
+            
+            // Notifications button
+            elements.notificationsBtn.addEventListener('click', () => {
+                showToast('No new notifications', 'info');
+                elements.notificationBadge.textContent = '';
+            });
+            
+            // User menu
+            elements.userMenuBtn.addEventListener('click', () => {
+                elements.userDropdown.classList.toggle('hidden');
+            });
+            
+            // Logout
+            elements.logoutBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    // Clear current user
+                    AppState.currentUser = null;
+                    
+                    // Switch to login page
+                    elements.appContainer.classList.add('hidden');
+                    elements.loginPage.classList.remove('hidden');
+                    
+                    // Reset login form
+                    elements.loginForm.reset();
+                    
+                    showToast('Logged out successfully', 'success');
+                }
+            });
+            
+            // Sidebar navigation
+            elements.sidebarItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const page = item.dataset.page;
+                    if (page) {
+                        showPage(page);
+                        
+                        // Close sidebar on mobile
+                        if (window.innerWidth <= 1024) {
+                            elements.sidebar.classList.add('collapsed');
+                        }
+                    }
+                });
+            });
+            
+            // View map button (on landing page)
+            if (elements.viewMapBtn) {
+                elements.viewMapBtn.addEventListener('click', () => {
+                    showPage('incidentMap');
+                });
+            }
+            
+            // Add incident buttons
+            if (elements.addIncidentBtn) {
+                elements.addIncidentBtn.addEventListener('click', addIncident);
+            }
+            
+            if (elements.addIncidentMapBtn) {
+                elements.addIncidentMapBtn.addEventListener('click', addIncident);
+            }
+            
+            // Add user button
+            if (elements.addUserBtn) {
+                elements.addUserBtn.addEventListener('click', addUser);
+            }
+            
+            // Incident form submission
+            elements.incidentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(elements.incidentForm);
+                saveIncident(formData);
+            });
+            
+            // User form submission
+            elements.userForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(elements.userForm);
+                saveUser(formData);
+            });
+            
+            // Map filter changes
+            if (document.getElementById('incidentTypeFilter')) {
+                document.getElementById('incidentTypeFilter').addEventListener('change', updateMapIncidents);
+            }
+            
+            if (document.getElementById('severityFilter')) {
+                document.getElementById('severityFilter').addEventListener('change', updateMapIncidents);
+            }
+            
+            // Refresh map button
+            if (document.getElementById('refreshMapBtn')) {
+                document.getElementById('refreshMapBtn').addEventListener('click', updateMapIncidents);
+            }
+            
+            // Modal close buttons
+            document.querySelectorAll('.modal .btn, .modal').forEach(btn => {
+                if (btn.id && btn.id.includes('close') || btn.id.includes('cancel')) {
+                    btn.addEventListener('click', () => {
+                        btn.closest('.modal').classList.remove('active');
+                    });
+                }
+            });
+            
+            // Close modal when clicking outside
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('active');
+                    }
+                });
+            });
+            
+            // Map selection for incident location
+            if (document.getElementById('selectOnMapBtn')) {
+                document.getElementById('selectOnMapBtn').addEventListener('click', () => {
+                    // Show map selection modal
+                    elements.mapSelectionModal.classList.add('active');
+                    
+                    // Initialize selection map if not already done
+                    if (!AppState.selectionMap) {
+                        setTimeout(() => {
+                            AppState.selectionMap = L.map('selectionMap').setView([
+                                AppState.systemConfig.mapSettings.defaultLat, 
+                                AppState.systemConfig.mapSettings.defaultLng
+                            ], AppState.systemConfig.mapSettings.defaultZoom);
+                            
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            }).addTo(AppState.selectionMap);
+                            
+                            // Add click event to map
+                            AppState.selectionMap.on('click', (e) => {
+                                AppState.selectedLocation = e.latlng;
+                                
+                                // Clear existing marker
+                                AppState.selectionMap.eachLayer(layer => {
+                                    if (layer instanceof L.Marker) {
+                                        AppState.selectionMap.removeLayer(layer);
+                                    }
+                                });
+                                
+                                // Add marker at clicked location
+                                L.marker(AppState.selectedLocation).addTo(AppState.selectionMap)
+                                    .bindPopup('Selected location')
+                                    .openPopup();
+                            });
+                        }, 100);
+                    }
+                });
+            }
+            
+            // Confirm location button
+            if (document.getElementById('confirmLocationBtn')) {
+                document.getElementById('confirmLocationBtn').addEventListener('click', () => {
+                    if (AppState.selectedLocation) {
+                        document.getElementById('incidentLat').value = AppState.selectedLocation.lat;
+                        document.getElementById('incidentLng').value = AppState.selectedLocation.lng;
+                        document.getElementById('incidentLocation').value = `${AppState.selectedLocation.lat.toFixed(6)}, ${AppState.selectedLocation.lng.toFixed(6)}`;
+                        
+                        elements.mapSelectionModal.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Tab switching in system config
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+                    
+                    // Hide all tab content
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    
+                    // Show corresponding tab content
+                    const tabId = tab.dataset.tab;
+                    document.getElementById(tabId).classList.remove('hidden');
+                });
+            });
+            
+            // Zoom level display
+            if (document.getElementById('defaultZoom')) {
+                document.getElementById('defaultZoom').addEventListener('input', (e) => {
+                    document.getElementById('zoomValue').textContent = e.target.value;
+                });
+            }
+            
+            // Save map config button
+            if (document.getElementById('saveMapConfigBtn')) {
+                document.getElementById('saveMapConfigBtn').addEventListener('click', saveMapConfig);
+            }
+            
+            // Save notification config button
+            if (document.getElementById('saveNotificationConfigBtn')) {
+                document.getElementById('saveNotificationConfigBtn').addEventListener('click', saveNotificationConfig);
+            }
+            
+            // Log filters
+            if (document.getElementById('logTypeFilter')) {
+                document.getElementById('logTypeFilter').addEventListener('change', updateAuditLogsTable);
+            }
+            
+            if (document.getElementById('logDateFilter')) {
+                document.getElementById('logDateFilter').addEventListener('change', updateAuditLogsTable);
+            }
+            
+            // Learn more button
+            if (document.getElementById('learnMoreBtn')) {
+                document.getElementById('learnMoreBtn').addEventListener('click', () => {
+                    showToast('For more information, contact the IRIM development team.', 'info');
+                });
+            }
+        }
+        
+        // Initialize the app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
